@@ -6,7 +6,7 @@ This script reads csv lines from stdin and creates a plot which it displays inli
 in your shell window if you are using the [**mlterm**](http://mlterm.sourceforge.net) terminal emulator program. It
 does this by using pandas and matplotlib to process the csv data and generate an
 image of a plot, which it converts to 'sixel' format and writes to stdout. The 
-mlterm terminal emulator recognizes the 'sixel' stream and converts it into pixels
+mlterm terminal emulator recognizes the 'sixel' stream and converts the stream into pixels
 which it draws inline with your shell output.
 
 ## Examples
