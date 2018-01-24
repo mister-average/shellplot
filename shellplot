@@ -1,0 +1,323 @@
+#!/bin/python
+
+'''
+This script reads csv lines from stdin and creates a plot which it displays inline 
+in your shell window if you are using the mlterm terminal emulator program. It
+does this by using pandas and matplotlib to process the csv data and generate an
+image of a plot, which it converts to 'sixel' format and writes to stdout. The 
+mlterm terminal emulator recognizes the 'sixel' stream and converts it into pixels
+which it draws inline with your shell output.
+
+DEPENDENCIES:
+mlterm - http://mlterm.sourceforge.net
+img2sixel - https://github.com/saitoha/libsixel
+
+and the following python packages
+pandas
+matplotlib
+dateutil
+textwrap
+numpy
+
+EXAMPLES:
+sar -u | grep all | sed -e 's/all//' -e 's/   */, /g' | grep -v Ave | shellplot -stacked -area -labels "user nice system iowait steal idle" -map flag
+sar -r | grep -v used | grep -v Ave | awk '{print $1, $2, ", ", $5}' |grep -v Linux | grep -v '  ,' | shellplot -area -label0 'Memory used'
+grep -h UPLOAD vsftpd.log* |  sed -e 's/\[pid.* \([0-9]*\) bytes.*/, \1/' | shellplot -area -title "FTP bytes received by time"
+aws ec2 describe-spot-price-history --availability-zone us-west-2c --instance-types r3.4xlarge --product-description "Linux/UNIX (Amazon VPC)"  --output text | awk '{print $6, ", ", $5}' | shellplot
+
+OPTIONS:
+-maps (use by itself to show what all the colormaps look like so you can pick one you like)
+-title "Some text" (defaults to displaying the value of environment variable FULL_COMMAND_LINE or BASH_COMMAND)
+-map "colormap name" (defaults to colormap 'tab20')
+-output "path.png" (save a copy of the plot to a png file)
+-labels "something1 something2 something3..." (whitespace separated column labels)
+-label1 "something" (specific label for column 1)
+-labelN "something" (specific label for column N)
+-line (draw a line plot)
+-bar (draw a bar plot)
+-area (draw an area plot)
+-stacked (stack multiple columns if there are more than one)
+'''
+
+__author__ = "Mister Average"
+__contact__ = "https://github.com/mister-average"
+
+import sys
+
+if len(sys.argv) == 2 and sys.argv[1] == '-h':
+    print __doc__
+    sys.exit(0)
+
+import pandas
+import matplotlib
+import tempfile
+import os
+import StringIO
+import shutil
+import collections
+import dateutil.parser
+from textwrap import wrap
+
+
+if '-v' in sys.argv:
+    print_values = True
+else:
+    print_values = False
+
+def generic_converter_function(a_string):
+    ret_val = a_string
+
+    if print_values:
+        sys.stderr.write("|" + a_string + '|\n')
+        sys.stderr.flush()
+
+    # int
+    try:
+        ret_val = int(a_string)
+        return ret_val
+    except:
+        pass
+
+
+    # float
+    try:
+        ret_val = float(a_string)
+        return ret_val
+    except:
+        pass
+
+    # Date
+    try:
+        ret_val = dateutil.parser.parse(a_string, ignoretz = True)
+        return ret_val
+    except:
+        pass
+
+    return a_string
+
+def default_dict_factory_function():
+    return generic_converter_function
+
+universal_converters_dict = collections.defaultdict(default_dict_factory_function)
+
+for i in range(0,100):
+    universal_converters_dict[i]
+
+#from pdb import set_trace
+matplotlib.use('Agg')
+
+# Create a temp dir
+work_dir = tempfile.mkdtemp()
+os.chdir(work_dir)
+
+import matplotlib.pyplot as plt
+
+if '-maps' in sys.argv:
+    from pylab import *
+    from numpy import outer
+    from matplotlib import rcParams
+    #rcParams.update({'figure.autolayout': True})
+    rc('text', usetex=False)
+    a=outer(arange(0,1,0.01),ones(10))
+    figure(figsize=(10,5))
+    subplots_adjust(top=0.8,bottom=0.05,left=0.01,right=0.99)
+    maps=[m for m in cm.datad if not m.endswith("_r")]
+    maps.sort()
+    l=len(maps)+1
+    for i, m in enumerate(maps):
+        subplot(1,l,i+1)
+        axis("off")
+        imshow(a,aspect='auto',cmap=get_cmap(m),origin="lower")
+        title(m,rotation=90,fontsize=8, y=1.00, verticalalignment='bottom')
+        
+    savefig("colormaps.png",dpi=100,facecolor='gray')
+    os.system("/home/scripts/bin/imgcat colormaps.png")
+    shutil.rmtree(work_dir)
+    sys.exit(0)
+
+dataframe = pandas.read_csv(StringIO.StringIO(sys.stdin.read()), converters = universal_converters_dict, index_col = 0, header = None)
+sorted_dataframe = dataframe.sort_index()
+
+
+plt.style.use('dark_background')
+matplotlib.rc('xtick', labelsize=6)
+matplotlib.rc('ytick', labelsize=6)
+
+from matplotlib import rcParams
+rcParams.update({'figure.autolayout': True})
+
+from matplotlib.ticker import EngFormatter
+
+fig = plt.figure(figsize=(12, 8), dpi=100)
+
+if 'FULL_COMMAND_LINE' in os.environ:
+    title = os.environ['FULL_COMMAND_LINE']
+elif 'BASH_COMMAND' in os.environ:
+    title = os.environ['BASH_COMMAND']
+else:
+    title = None
+
+
+ax = fig.add_subplot(111)
+
+the_formatter = EngFormatter()
+ax.yaxis.set_major_formatter(the_formatter)
+
+kind = 'line'
+stacked = False
+colormap = 'tab20'
+extra_output_path = None
+
+num_columns = len(sorted_dataframe.columns)
+
+labels = [ '' ] * num_columns
+
+arg_num = -1 
+
+# Parse the args in a lazy and brittle way
+for an_arg in sys.argv:
+    arg_num += 1
+
+    if an_arg == '-title':
+        title = sys.argv[arg_num + 1]
+
+    if an_arg == '-map':
+        colormap = sys.argv[arg_num + 1]
+
+    if an_arg == '-output':
+        extra_output_path = sys.argv[arg_num + 1]
+
+    if an_arg == '-labels':
+        labels_arg = sys.argv[arg_num + 1]
+        labels_arg_list = labels_arg.split()
+        for i, label_text in enumerate(labels_arg_list):
+            labels[i] = label_text
+
+        
+    elif an_arg.startswith('-label'):
+        label_num = int(an_arg.replace('-label', ''))
+        the_label = sys.argv[arg_num + 1]
+        labels[label_num] = the_label
+        
+    if an_arg == '-line':
+        kind = 'line'
+
+    elif an_arg == '-bar':
+        kind = 'bar'
+
+    elif an_arg == '-area':
+        kind = 'area'
+        
+    elif an_arg == '-stacked':
+        stacked = 'stacked'
+
+
+
+try:
+    sorted_dataframe.plot(ax = ax, stacked = stacked, kind = kind, colormap=colormap)
+    
+    # Hide the legend unless labels have been specified
+    hide_legend = True
+    for item in labels:
+        if item != '':
+            hide_legend = False
+    if hide_legend:
+        ax.legend().set_visible(False)
+    else:
+        ax.legend(labels)
+
+    # If the x axis represents time, do some special things
+    if sorted_dataframe.index.dtype_str == 'datetime64[ns]':
+        # Try to use automatic date formatting for the x axis
+        fig.autofmt_xdate() 
+    
+        x_min = sorted_dataframe.index.min()
+        x_max = sorted_dataframe.index.max()
+
+        x_axis_date_range = x_max - x_min
+
+        one_day = pandas.Timedelta(days=1)
+
+        # If the x range is more than 1 day, draw pale vertical rectangles on the weekends
+        if x_axis_date_range > one_day:
+            loop_date = x_min.round('d')
+
+            # Crawl along the x axis by day
+            while loop_date < sorted_dataframe.index.max():
+                # Weekday 5 = Saturday, 6 = Sunday
+                if loop_date.weekday() in ( 5, 6 ):
+                    
+                    # Make sure the left and right edges of the rectangle we're trying to draw 
+                    # don't extend past the original min and max values of the data
+                    left_edge = min(max(x_min, loop_date), x_max)
+                    right_edge = min(max(x_min, loop_date + one_day), x_max)
+
+                    plt.axvspan(left_edge, right_edge, facecolor='#2c2c2c', alpha=0.5)
+
+                loop_date += one_day
+
+
+except ( ValueError, TypeError), reason:
+    # Someone on stackoverflow said Seaborn had better handling for categorical plots
+    if str(reason).startswith('invalid literal for float():'):
+        import seaborn as sns
+
+        stripplot = sns.barplot(x = dataframe.index.values, y = dataframe[dataframe.columns[0]].tolist())
+        x_tick_labels = stripplot.get_xticklabels()
+        
+        stripplot.set_xticklabels(x_tick_labels, rotation = 90)
+        
+        fig = stripplot.get_figure()
+
+# Have to make sure that we're not just viewing the very top slice of the graph
+ax.set_ylim(ymin=0)
+
+# Make a light grid
+plt.grid(b=True, which='both', linestyle='-', color='0.35')
+
+if title:
+#    fig.suptitle('', fontsize=8, y=1.00)
+    ax.set_title("\n".join(wrap(title, 200)), fontsize=8)
+
+# The dataframe puts some kind of crazy label on the X axis
+plt.xlabel('')
+
+# If we need to save out a copy of the image, do it here
+if extra_output_path:
+    fig.savefig(extra_output_path)
+
+# Find img2sixel
+img2sixel_path = None
+lib_dir = None
+
+for bin_dir in os.environ['PATH'].split(os.pathsep):
+    if os.path.exists(os.path.join(bin_dir, 'img2sixel')):
+        img2sixel_path = os.path.join(bin_dir, 'img2sixel')
+        parent_dir = os.path.dirname(bin_dir)
+        lib_dir = os.path.join(parent_dir, 'lib')
+        break
+
+# Sixelplot can write directly to stdout from matplotlib, 
+# but the image it produces is not as crisp as the one I
+# get from first writing out a png and then using img2sixel.
+
+try_sixelplot = True
+try:
+    if img2sixel_path is not None:
+        fig.savefig('graph.png')
+    
+        os.system('export LD_LIBRARY_PATH="%s:${LD_LIBRARY_PATH}" ; imgcat graph.png'%lib_dir)
+        shutil.rmtree(work_dir)
+        try_sixelplot = False
+        
+except:
+    pass
+    
+if try_sixelplot:
+    import sixelplot
+    sixelplot.show()
+
+col = dataframe[dataframe.columns[0]]
+
+print "min = %f, avg = %f, max = %f"%(col.min(), col.mean(), col.max())
+
