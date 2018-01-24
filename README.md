@@ -25,7 +25,7 @@ sar -r | grep -v used | grep -v Ave | awk '{print $1, $2, ", ", $5}' |grep -v Li
 
 
 
-*(the plot below features automatic highlighting of weekends)*
+*(the two plots below feature automatic highlighting of weekends)*
 
 ```
 grep -h UPLOAD vsftpd.log* |  sed -e 's/\[pid.* \([0-9]*\) bytes.*/, \1/' | shellplot -area -title "FTP bytes received by time"
