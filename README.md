@@ -24,6 +24,9 @@ sar -r | grep -v used | grep -v Ave | awk '{print $1, $2, ", ", $5}' |grep -v Li
 ![sar memory screenshot](docs/images/sar_mem.png?raw=true "sar Memory")
 
 
+
+*(the plot below features automatic highlighting of weekends)*
+
 ```
 grep -h UPLOAD vsftpd.log* |  sed -e 's/\[pid.* \([0-9]*\) bytes.*/, \1/' | shellplot -area -title "FTP bytes received by time"
 ```
