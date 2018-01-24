@@ -90,4 +90,5 @@ Mr. Average
 
 ## License
 
-MIT
+Apache 2.0
+
