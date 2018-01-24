@@ -50,16 +50,16 @@ The [sixelplot project](https://github.com/kktk-KO/sixelplot) has a hint of this
 
 ## Installation
 
-+ Download the shellplot script and place it in your path. 
-+ Download the source to libsixel, compile and install it so that it puts the utility img2sixel in your path.
-+ Use the mlterm terminal emulator (instead of xterm, putty, konsole, gnome-terminal, etc.)
++ Download the shellplot script and place it in your path on the remote host. 
++ Download the source to libsixel, compile and install it so that it puts the utility img2sixel in your path on the remote host.
++ Use the mlterm terminal emulator (instead of xterm, putty, konsole, gnome-terminal, etc.) on your desktop box.
 
 DEPENDENCIES:
 
-+ mlterm - http://mlterm.sourceforge.net
-+ img2sixel - https://github.com/saitoha/libsixel
++ mlterm - http://mlterm.sourceforge.net (on your desktop box)
++ img2sixel - https://github.com/saitoha/libsixel (on the remote host)
 
-and the following python packages
+and the following python packages (on the remote host)
 
 + pandas
 + matplotlib
