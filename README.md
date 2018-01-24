@@ -71,6 +71,7 @@ and the following python packages
 
 OPTIONS:
 
+    -h (shows help)
     -maps (use by itself to show what all the colormaps look like so you can pick one you like)
     -map "colormap name" (pick a map name displayed by the -maps option; defaults to colormap 'tab20')
     -title "Some text" (defaults to displaying the value of environment variable FULL_COMMAND_LINE or BASH_COMMAND)
